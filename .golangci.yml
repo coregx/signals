@@ -1,0 +1,202 @@
+# GolangCI-Lint v2.5 Configuration for Signals Library
+# Documentation: https://golangci-lint.run/docs/configuration/
+# STRICT CONFIGURATION - Production-ready reactive library
+
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  # Enable comprehensive set of linters for production-quality code
+  enable:
+    # Code quality and complexity
+    - gocyclo       # Check cyclomatic complexity
+    - gocognit      # Check cognitive complexity
+    - funlen        # Check function length
+    - maintidx      # Maintainability index
+    - cyclop        # Check cyclomatic complexity (alternative)
+    - nestif        # Reports deeply nested if statements
+
+    # Bug detection
+    - govet         # Standard Go vet (includes copylocks!)
+    - staticcheck   # Comprehensive static analysis
+    - errcheck      # Check that errors are handled
+    - errorlint     # Check error wrapping
+    - gosec         # Security issues
+    - nilnil        # Check that functions don't return nil both ways
+    - nilerr        # Check nil error returns
+    - nilnesserr    # Check nil error returns patterns
+    - ineffassign   # Detect ineffectual assignments
+
+    # Code style and consistency
+    - misspell      # Check for misspelled words
+    - whitespace    # Check for trailing whitespace
+    - unconvert     # Remove unnecessary type conversions
+    - unparam       # Detect unused function parameters
+
+    # Naming conventions
+    - errname       # Check error naming conventions
+    - revive        # Fast, configurable, extensible linter
+
+    # Performance
+    - prealloc      # Find slice declarations that could be preallocated
+    - bodyclose     # Check HTTP response bodies are closed
+    - makezero      # Find slice declarations with non-zero initial length
+
+    # Code practices
+    - goconst       # Find repeated strings that could be constants
+    - gocritic      # Comprehensive code checker
+    - goprintffuncname  # Check printf-like function names
+    - nolintlint    # Check nolint directives are used correctly
+    - nakedret      # Checks for naked returns
+
+    # Comments and documentation
+    # godot disabled - requiring periods in every comment creates noise
+    # Package documentation is handled by revive's package-comments rule
+
+    # Additional quality checkers
+    - dupl          # Detect duplicate code
+    - dogsled       # Check for assignments with too many blank identifiers
+    - durationcheck # Check for two durations multiplied together
+
+  settings:
+    govet:
+      # EXPLICITLY ENABLE copylocks - CRITICAL for signals library!
+      # Signals use mutexes heavily, copying them is a bug
+      enable:
+        - copylocks
+      # Disable fieldalignment (memory optimization not critical)
+      disable:
+        - fieldalignment
+
+    gocyclo:
+      # Strict threshold for reactive library
+      min-complexity: 12
+
+    cyclop:
+      # Max complexity
+      max-complexity: 12
+
+    funlen:
+      # Keep functions small and focused for reactive patterns
+      # Test functions with subtests can be longer
+      lines: 120
+      statements: 50
+
+    gocognit:
+      # Cognitive complexity threshold
+      min-complexity: 15
+
+    misspell:
+      locale: US
+
+    nestif:
+      # Max nesting level (reactive code should be flat)
+      min-complexity: 4
+
+    revive:
+      # Enable important rules for code quality
+      # NOTE: When rules are explicitly listed, ONLY those rules are enabled
+      # Revive won't use default rules if you have a rules: section
+      rules:
+        - name: var-naming
+        - name: exported
+        - name: error-return
+        - name: error-naming
+        - name: if-return
+        - name: increment-decrement
+        - name: var-declaration
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: time-naming
+        - name: unexported-return
+        - name: indent-error-flow
+        - name: errorf
+        - name: empty-block
+        - name: superfluous-else
+        - name: unreachable-code
+        - name: redefines-builtin-id
+        # Explicitly disable unused-parameter - too noisy for callback-heavy reactive code
+        - name: unused-parameter
+          disabled: true
+
+    gocritic:
+      # Enable important checks
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+
+      # Disable overly opinionated/experimental checks
+      disabled-checks:
+        - commentFormatting  # Too opinionated about comment style
+        - whyNoLint          # We document nolints when needed
+        - unnamedResult      # Named results can reduce readability
+
+      settings:
+        hugeParam:
+          # Signals library doesn't pass large structs
+          sizeThreshold: 128
+
+  # Exclusions (v2 structure: linters.exclusions.rules)
+  exclusions:
+    rules:
+      # Test files can be less strict
+      - path: _test\.go
+        linters:
+          - gocyclo
+          - cyclop
+          - funlen
+          - maintidx
+          - errcheck
+          - gosec
+          - goconst
+          - dupl
+          - gocognit
+          - revive         # Test code can have unused params in callbacks
+
+      # Benchmark files
+      - path: _bench_test\.go
+        linters:
+          - gocyclo
+          - cyclop
+          - funlen
+          - errcheck
+          - dupl
+          - revive         # Benchmark code can have unused params
+
+      # cmd/example - demonstration code
+      - path: cmd/example
+        linters:
+          - errcheck     # Examples may skip error handling for clarity
+          - errorlint    # Examples may use %v instead of %w
+          - funlen       # Example main() can be longer
+          - gocyclo      # Example complexity acceptable
+          - cyclop       # Example complexity acceptable
+          - gocognit     # Example complexity acceptable
+          - gosec        # Examples may have security warnings
+          - revive       # Examples don't need full package documentation
+
+      # effect.go - Effect cleanup handling has necessary nesting
+      - path: effect\.go
+        linters:
+          - gocognit     # run() method manages complex cleanup sequencing
+          - nestif       # Cleanup conditionals are necessary throughout
+
+      # effect_test.go - Test has subtests
+      - path: effect_test\.go
+        linters:
+          - funlen       # Test has subtests that verify multiple cleanup scenarios
+        text: "TestEffect_Cleanup"
+
+
+issues:
+  # Show all issues
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Don't hide new issues in existing files
+  new: false

@@ -1,0 +1,380 @@
+# Taskfile for Signals Library
+# Install Task: https://taskfile.dev/installation/
+# Usage: task <task-name>
+# Example: task test, task lint, task bench
+# Note: We also have a Makefile - use whichever you prefer!
+
+version: '3'
+
+vars:
+  # Coverage threshold
+  COVERAGE_THRESHOLD: 70
+
+  # Linter timeout
+  LINT_TIMEOUT: 5m
+
+tasks:
+  # Default task (runs when you type just "task")
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  # ========================================
+  # Testing
+  # ========================================
+
+  test:
+    desc: Run all tests with coverage
+    cmds:
+      - go test -v -cover ./...
+
+  test:race:
+    desc: Run all tests with race detector (requires GCC/CGO)
+    cmds:
+      - go test -v -race -cover ./...
+
+  test:coverage:
+    desc: Run tests and generate HTML coverage report
+    cmds:
+      - go test -v -coverprofile=coverage.out ./...
+      - go tool cover -html=coverage.out -o coverage.html
+      - cmd: echo "✅ Coverage report generated at coverage.html"
+        silent: true
+
+  test:watch:
+    desc: Run tests in watch mode (requires entr or fswatch)
+    cmds:
+      - |
+        find . -name "*.go" -not -path "./cmd/*" | entr -c go test -v ./...
+
+  # ========================================
+  # Linting & Code Quality
+  # ========================================
+
+  lint:
+    desc: Run golangci-lint on all packages
+    cmds:
+      - golangci-lint run --config .golangci.yml --timeout={{.LINT_TIMEOUT}} ./...
+
+  lint:fix:
+    desc: Run golangci-lint and auto-fix issues
+    cmds:
+      - golangci-lint run --config .golangci.yml --fix ./...
+
+  fmt:
+    desc: Format all Go code with gofmt
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: Run go vet on all packages
+    cmds:
+      - go vet ./...
+
+  check:
+    desc: Run all quality checks (fmt, vet, lint, test)
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: test
+      - cmd: echo "✅ All quality checks passed!"
+        silent: true
+
+  # ========================================
+  # Building
+  # ========================================
+
+  build:
+    desc: Build all packages
+    cmds:
+      - go build ./...
+
+  build:example:
+    desc: Build example application
+    cmds:
+      - go build -o bin/example.exe ./cmd/example
+      - cmd: echo "✅ Example built at bin/example.exe"
+        silent: true
+
+  # ========================================
+  # Dependencies
+  # ========================================
+
+  deps:
+    desc: Download and tidy all dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+      - cmd: echo "✅ Dependencies updated"
+        silent: true
+
+  deps:verify:
+    desc: Verify dependencies haven't been modified
+    cmds:
+      - go mod verify
+      - cmd: echo "✅ Dependencies verified"
+        silent: true
+
+  deps:update:
+    desc: Update all dependencies to latest
+    cmds:
+      - go get -u ./...
+      - go mod tidy
+      - cmd: echo "✅ Dependencies updated to latest"
+        silent: true
+
+  # ========================================
+  # Benchmarking
+  # ========================================
+
+  bench:
+    desc: Run all benchmarks
+    cmds:
+      - go test -bench=. -benchmem ./...
+
+  bench:signal:
+    desc: Run Signal benchmarks only
+    cmds:
+      - go test -bench=BenchmarkSignal -benchmem ./...
+
+  bench:computed:
+    desc: Run Computed benchmarks only
+    cmds:
+      - go test -bench=BenchmarkComputed -benchmem ./...
+
+  bench:effect:
+    desc: Run Effect benchmarks only
+    cmds:
+      - go test -bench=BenchmarkEffect -benchmem ./...
+
+  bench:mem:
+    desc: Run benchmarks with memory profiling
+    cmds:
+      - go test -bench=. -benchmem -memprofile=mem.out ./...
+      - cmd: echo "✅ Memory profile saved to mem.out (use: go tool pprof mem.out)"
+        silent: true
+
+  bench:cpu:
+    desc: Run benchmarks with CPU profiling
+    cmds:
+      - go test -bench=. -benchmem -cpuprofile=cpu.out ./...
+      - cmd: echo "✅ CPU profile saved to cpu.out (use: go tool pprof cpu.out)"
+        silent: true
+
+  bench:compare:
+    desc: Run benchmarks and compare with previous results
+    cmds:
+      - go test -bench=. -benchmem ./... | tee bench-new.txt
+      - cmd: echo "Compare with 'benchstat bench-old.txt bench-new.txt'"
+        silent: true
+
+  # ========================================
+  # Cleaning
+  # ========================================
+
+  clean:
+    desc: Remove build artifacts and coverage files
+    cmds:
+      - cmd: echo "Cleaning build artifacts..."
+        silent: true
+      - rm -f coverage.out coverage.html
+      - rm -f mem.out cpu.out
+      - rm -f **/*.test
+      - rm -f **/*.coverprofile
+      - rm -f bench-*.txt
+      - rm -rf bin/
+      - go clean -testcache
+      - cmd: echo "✅ Clean complete!"
+        silent: true
+
+  # ========================================
+  # Development Helpers
+  # ========================================
+
+  dev:
+    desc: Run development checks before commit
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint:fix
+      - task: test
+      - cmd: echo "✅ All checks passed! Ready to commit."
+        silent: true
+
+  ci:
+    desc: Run CI checks (same as GitHub Actions)
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: lint
+      - task: test:coverage
+      - task: build
+      - cmd: echo "✅ CI checks passed!"
+        silent: true
+
+  pre-commit:
+    desc: Run pre-commit checks (fast)
+    cmds:
+      - task: fmt
+      - task: vet
+      - task: test
+      - cmd: echo "✅ Pre-commit checks passed!"
+        silent: true
+
+  pre-release:
+    desc: Run comprehensive pre-release checks
+    cmds:
+      - bash scripts/pre-release-check.sh
+
+  # ========================================
+  # Examples
+  # ========================================
+
+  run:example:
+    desc: Run the main example
+    cmds:
+      - go run ./cmd/example
+
+  example:
+    desc: Alias for run:example
+    cmds:
+      - task: run:example
+
+  # ========================================
+  # Release
+  # ========================================
+
+  release:check:
+    desc: Check if ready for release
+    cmds:
+      - task: ci
+      - task: bench
+      - go mod verify
+      - cmd: echo "✅ Ready for release!"
+        silent: true
+
+  release:tag:
+    desc: Create a git tag (requires VERSION variable)
+    cmds:
+      - |
+        if [ -z "{{.VERSION}}" ]; then
+          echo "❌ Error: VERSION variable required"
+          echo "Usage: task release:tag VERSION=v0.1.0"
+          exit 1
+        fi
+        git tag -a {{.VERSION}} -m "Release {{.VERSION}}"
+        echo "✅ Tag {{.VERSION}} created"
+        echo "Push with: git push origin {{.VERSION}}"
+
+  # ========================================
+  # Documentation
+  # ========================================
+
+  docs:serve:
+    desc: Serve documentation locally
+    cmds:
+      - godoc -http=:6060
+      - cmd: echo "Documentation at http://localhost:6060/pkg/github.com/coregx/signals/"
+        silent: true
+
+  docs:check:
+    desc: Check documentation completeness
+    cmds:
+      - |
+        echo "Checking godoc comments..."
+        missing=$(go doc -all 2>&1 | grep "no documentation" || true)
+        if [ -n "$missing" ]; then
+          echo "⚠️  Missing documentation:"
+          echo "$missing"
+        else
+          echo "✅ All exported items are documented"
+        fi
+
+  # ========================================
+  # Security
+  # ========================================
+
+  security:scan:
+    desc: Run security vulnerability scan
+    cmds:
+      - go install golang.org/x/vuln/cmd/govulncheck@latest
+      - govulncheck ./...
+      - cmd: echo "✅ Security scan complete"
+        silent: true
+
+  # ========================================
+  # Git Helpers
+  # ========================================
+
+  git:status:
+    desc: Show git status and uncommitted changes
+    cmds:
+      - git status
+
+  git:diff:
+    desc: Show git diff
+    cmds:
+      - git diff
+
+  git:log:
+    desc: Show recent git commits
+    cmds:
+      - git log --oneline -10
+
+  # ========================================
+  # Statistics
+  # ========================================
+
+  stats:
+    desc: Show project statistics
+    cmds:
+      - |
+        echo "📊 Project Statistics"
+        echo ""
+        echo "Code:"
+        echo "  Source files: $(find . -name "*.go" -not -path "./*_test.go" -not -path "./*_bench_test.go" | wc -l)"
+        echo "  Test files: $(find . -name "*_test.go" | wc -l)"
+        echo "  Lines of code: $(find . -name "*.go" -not -path "./vendor/*" -exec cat {} \; | wc -l)"
+        echo ""
+        echo "Tests:"
+        go test -v ./... 2>&1 | grep -E "PASS|FAIL" | tail -1
+        echo ""
+        echo "Coverage:"
+        go test -cover ./... 2>&1 | grep coverage | head -1
+
+  stats:coverage:
+    desc: Show detailed coverage statistics
+    cmds:
+      - go test -coverprofile=coverage.out ./...
+      - go tool cover -func=coverage.out
+
+  # ========================================
+  # Help & Info
+  # ========================================
+
+  info:
+    desc: Show project information
+    cmds:
+      - |
+        echo "🔰 Signals Library v0.1.0-beta"
+        echo ""
+        echo "📦 Module: github.com/coregx/signals"
+        echo "🏗️  Go Version: $(go version | cut -d' ' -f3)"
+        echo "📊 Status: Core complete (67%), ready for early adopters"
+        echo ""
+        echo "📚 Quick Start:"
+        echo "  task test       - Run all tests"
+        echo "  task lint       - Run linter"
+        echo "  task bench      - Run benchmarks"
+        echo "  task dev        - Pre-commit checks"
+        echo "  task ci         - Full CI checks"
+        echo ""
+        echo "📖 Documentation: task docs:serve"
+        echo "🔍 More tasks: task --list"
+
+  help:
+    desc: Show help information
+    cmds:
+      - task: info
