@@ -469,10 +469,6 @@ func TestComputed_SubscriberPanicWithHandler(t *testing.T) {
 		Options[int]{
 			OnPanic: func(err any, stack []byte) {
 				atomic.AddInt32(&panicHandlerCalled, 1)
-				if err != "computed subscriber panic" {
-					// Can't use t.Errorf here safely from arbitrary goroutine
-					// but the count check below will catch issues
-				}
 			},
 		},
 		count.AsReadonly(),
