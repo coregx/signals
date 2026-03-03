@@ -132,6 +132,63 @@ func TestSubscribeAnyType_InvalidDependency(t *testing.T) {
 	})
 }
 
+// Mock types for testing subscribeAnyType guard clauses.
+
+// mockWrongSignature has SubscribeForever with wrong number of inputs (0 instead of 1).
+type mockWrongSignature struct{}
+
+func (m mockWrongSignature) SubscribeForever() Unsubscribe { return func() {} }
+
+// mockWrongReturnCount has SubscribeForever that returns nothing.
+type mockWrongReturnCount struct{}
+
+func (m mockWrongReturnCount) SubscribeForever(fn func(int)) {}
+
+// mockWrongReturnType has SubscribeForever that returns string instead of Unsubscribe.
+type mockWrongReturnType struct{}
+
+func (m mockWrongReturnType) SubscribeForever(fn func(int)) string { return "" }
+
+// TestSubscribeAnyType_WrongSignature verifies graceful handling of types with
+// SubscribeForever method that has wrong signature (hits NumIn/NumOut guards).
+func TestSubscribeAnyType_WrongSignature(t *testing.T) {
+	t.Run("wrong input count", func(t *testing.T) {
+		var called int32
+		unsub := subscribeAnyType(mockWrongSignature{}, func() {
+			atomic.AddInt32(&called, 1)
+		})
+		unsub()
+
+		if got := atomic.LoadInt32(&called); got != 0 {
+			t.Errorf("wrong input count: onChange called %d times, want 0", got)
+		}
+	})
+
+	t.Run("wrong output count", func(t *testing.T) {
+		var called int32
+		unsub := subscribeAnyType(mockWrongReturnCount{}, func() {
+			atomic.AddInt32(&called, 1)
+		})
+		unsub()
+
+		if got := atomic.LoadInt32(&called); got != 0 {
+			t.Errorf("wrong output count: onChange called %d times, want 0", got)
+		}
+	})
+
+	t.Run("wrong return type", func(t *testing.T) {
+		var called int32
+		unsub := subscribeAnyType(mockWrongReturnType{}, func() {
+			atomic.AddInt32(&called, 1)
+		})
+		unsub()
+
+		if got := atomic.LoadInt32(&called); got != 0 {
+			t.Errorf("wrong return type: onChange called %d times, want 0", got)
+		}
+	})
+}
+
 // TestTrackDependency_AnyTypeSignal verifies that Signal[any] matches the subscriber interface directly.
 // Signal[any].SubscribeForever has signature func(func(any)) Unsubscribe, which matches
 // the subscriber interface in trackDependencyHelper.
