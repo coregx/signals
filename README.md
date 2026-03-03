@@ -2,13 +2,13 @@
 
 > **Type-safe reactive state management for Go, inspired by Angular Signals**
 
-[![Release](https://img.shields.io/github/v/release/coregx/signals?style=flat-square&logo=github&color=blue)](https://github.com/coregx/signals/releases)
+[![Release](https://img.shields.io/github/v/release/coregx/signals?style=flat-square&logo=github)](https://github.com/coregx/signals/releases)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/coregx/signals?style=flat-square&logo=go)](https://go.dev)
 [![Go Report Card](https://goreportcard.com/badge/github.com/coregx/signals?style=flat-square)](https://goreportcard.com/report/github.com/coregx/signals)
 [![GoDoc](https://img.shields.io/badge/godoc-reference-blue?style=flat-square&logo=go)](https://pkg.go.dev/github.com/coregx/signals)
 [![CI](https://img.shields.io/github/actions/workflow/status/coregx/signals/test.yml?branch=main&style=flat-square&logo=github&label=tests)](https://github.com/coregx/signals/actions)
 [![codecov](https://codecov.io/gh/coregx/signals/graph/badge.svg)](https://codecov.io/gh/coregx/signals)
-[![License](https://img.shields.io/github/license/coregx/signals?style=flat-square&color=blue)](LICENSE)
+[![License](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/coregx/signals?style=flat-square&logo=github)](https://github.com/coregx/signals/stargazers)
 
 A modern, production-grade reactive programming library for Go 1.25+ that brings Angular's powerful signals pattern to the Go ecosystem with full type safety, zero allocations in hot paths, and comprehensive concurrency support.
