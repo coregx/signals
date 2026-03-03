@@ -554,6 +554,92 @@ func TestEffect_CleanupOrder(t *testing.T) {
 	mu.Unlock()
 }
 
+// TestEffect_CleanupPanic_DefaultHandler verifies cleanup panic recovery without custom handler
+func TestEffect_CleanupPanic_DefaultHandler(t *testing.T) {
+	count := New(0)
+	effectRuns := atomic.Int32{}
+
+	eff := EffectWithCleanup(
+		func() func() {
+			effectRuns.Add(1)
+			currentValue := count.Get()
+			return func() {
+				if currentValue == 0 {
+					panic("cleanup panic without handler")
+				}
+			}
+		},
+		// No custom OnPanic — uses default log handler
+		count.AsReadonly(),
+	)
+	defer eff.Stop()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Initial run
+	if effectRuns.Load() != 1 {
+		t.Fatalf("Expected 1 initial run, got %d", effectRuns.Load())
+	}
+
+	// Trigger change — cleanup from initial run will panic, but should be recovered
+	count.Set(1)
+	time.Sleep(10 * time.Millisecond)
+
+	// Effect should still have run despite cleanup panic
+	if effectRuns.Load() != 2 {
+		t.Fatalf("Expected 2 runs after cleanup panic, got %d", effectRuns.Load())
+	}
+
+	// Effect should continue working
+	count.Set(2)
+	time.Sleep(10 * time.Millisecond)
+
+	if effectRuns.Load() != 3 {
+		t.Fatalf("Expected 3 runs (effect continues after cleanup panic), got %d", effectRuns.Load())
+	}
+}
+
+// TestEffect_PanicRecovery_DefaultHandler verifies effect panic recovery without custom handler
+func TestEffect_PanicRecovery_DefaultHandler(t *testing.T) {
+	count := New(0)
+	effectRuns := atomic.Int32{}
+
+	eff := Effect(
+		func() {
+			effectRuns.Add(1)
+			if count.Get() == 1 {
+				panic("effect panic without handler")
+			}
+		},
+		// No custom OnPanic — uses default log handler
+		count.AsReadonly(),
+	)
+	defer eff.Stop()
+
+	time.Sleep(10 * time.Millisecond)
+
+	// Initial run (no panic)
+	if effectRuns.Load() != 1 {
+		t.Fatalf("Expected 1 initial run, got %d", effectRuns.Load())
+	}
+
+	// Trigger panic
+	count.Set(1)
+	time.Sleep(10 * time.Millisecond)
+
+	if effectRuns.Load() != 2 {
+		t.Fatalf("Expected 2 runs (panic recovered), got %d", effectRuns.Load())
+	}
+
+	// Effect should continue working after panic
+	count.Set(2)
+	time.Sleep(10 * time.Millisecond)
+
+	if effectRuns.Load() != 3 {
+		t.Fatalf("Expected 3 runs (effect continues after panic), got %d", effectRuns.Load())
+	}
+}
+
 // TestEffect_WithComputedAndMultipleTypes tests effects with mixed type dependencies.
 func TestEffect_WithComputedAndMultipleTypes(t *testing.T) {
 	// Different types

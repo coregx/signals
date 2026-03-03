@@ -360,6 +360,70 @@ func TestSignal_NoMemoryLeak(t *testing.T) {
 	}
 }
 
+// TestReadonly_Subscribe verifies readonly.Subscribe with context cancellation
+func TestReadonly_Subscribe(t *testing.T) {
+	sig := New(0)
+	readonly := sig.AsReadonly()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	var called int32
+
+	readonly.Subscribe(ctx, func(v int) {
+		atomic.AddInt32(&called, 1)
+	})
+
+	sig.Set(1)
+	time.Sleep(10 * time.Millisecond)
+
+	if got := atomic.LoadInt32(&called); got != 1 {
+		t.Errorf("Before cancel, called = %d, want 1", got)
+	}
+
+	// Cancel context — should auto-unsubscribe
+	cancel()
+	time.Sleep(10 * time.Millisecond)
+
+	sig.Set(2)
+	time.Sleep(10 * time.Millisecond)
+
+	if got := atomic.LoadInt32(&called); got != 1 {
+		t.Errorf("After context cancel, called = %d, want 1 (no new calls)", got)
+	}
+}
+
+// TestSignal_Update_WithEqualFunc verifies Update respects EqualFunc
+func TestSignal_Update_WithEqualFunc(t *testing.T) {
+	// Signal with EqualFunc that considers values equal if they have the same sign
+	sig := NewWithOptions(5, Options[int]{
+		Equal: func(a, b int) bool {
+			return (a > 0) == (b > 0) // Same sign = equal
+		},
+	})
+
+	var called int32
+	unsub := sig.SubscribeForever(func(v int) {
+		atomic.AddInt32(&called, 1)
+	})
+	defer unsub()
+
+	// Update to different value but same sign — EqualFunc says equal, should NOT notify
+	sig.Update(func(v int) int { return v + 1 }) // 5 → 6, both positive
+	time.Sleep(10 * time.Millisecond)
+
+	if got := atomic.LoadInt32(&called); got != 0 {
+		t.Errorf("After Update to same-sign value, called = %d, want 0", got)
+	}
+
+	// Update to negative — different sign, should notify
+	sig.Update(func(v int) int { return -v }) // 6 → -6, sign changed
+	time.Sleep(10 * time.Millisecond)
+
+	if got := atomic.LoadInt32(&called); got != 1 {
+		t.Errorf("After Update to different-sign value, called = %d, want 1", got)
+	}
+}
+
 // TestSignal_ConcurrentReads verifies safe concurrent reads
 func TestSignal_ConcurrentReads(t *testing.T) {
 	sig := New(42)
