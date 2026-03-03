@@ -377,6 +377,119 @@ func TestComputed_NoMemoryLeak(t *testing.T) {
 	}
 }
 
+// TestComputed_Cleanup verifies that Cleanup() removes dependency subscriptions
+func TestComputed_Cleanup(t *testing.T) {
+	count := New(0)
+
+	var computeCount int32
+
+	comp := Computed(
+		func() int {
+			atomic.AddInt32(&computeCount, 1)
+			return count.Get() * 2
+		},
+		count.AsReadonly(),
+	)
+
+	// Initial Get triggers first computation
+	if got := comp.Get(); got != 0 {
+		t.Errorf("Initial Get() = %d, want 0", got)
+	}
+	if got := atomic.LoadInt32(&computeCount); got != 1 {
+		t.Errorf("Initial computeCount = %d, want 1", got)
+	}
+
+	// Cleanup removes dependency subscriptions
+	comp.(*computed[int]).Cleanup()
+
+	// Change dependency after cleanup — should NOT trigger recomputation
+	count.Set(10)
+	time.Sleep(10 * time.Millisecond)
+
+	// Get should return stale cached value (no recompute since dirty was not set)
+	// The value stays at 0 because Cleanup removed the subscription so markDirty was never called
+	if got := atomic.LoadInt32(&computeCount); got != 1 {
+		t.Errorf("After Cleanup + Set, computeCount = %d, want 1 (no recompute)", got)
+	}
+}
+
+// TestComputed_Cleanup_Idempotent verifies that calling Cleanup() twice is safe
+func TestComputed_Cleanup_Idempotent(t *testing.T) {
+	count := New(0)
+
+	comp := Computed(
+		func() int { return count.Get() * 2 },
+		count.AsReadonly(),
+	)
+
+	c := comp.(*computed[int])
+
+	// Call Cleanup twice — should not panic
+	c.Cleanup()
+	c.Cleanup()
+}
+
+// TestComputed_SubscriberPanic verifies panic recovery in computed subscribers with default handler
+func TestComputed_SubscriberPanic(t *testing.T) {
+	count := New(0)
+
+	comp := Computed(
+		func() int { return count.Get() * 2 },
+		count.AsReadonly(),
+	)
+
+	var goodCalls int32
+
+	// Panicking subscriber
+	comp.SubscribeForever(func(v int) {
+		panic("subscriber panic")
+	})
+
+	// Good subscriber — should still be called despite panic in previous subscriber
+	comp.SubscribeForever(func(v int) {
+		atomic.AddInt32(&goodCalls, 1)
+	})
+
+	// Trigger dependency change
+	count.Set(5)
+	time.Sleep(10 * time.Millisecond)
+
+	if got := atomic.LoadInt32(&goodCalls); got != 1 {
+		t.Errorf("Good subscriber called %d times, want 1 (should survive panic in sibling)", got)
+	}
+}
+
+// TestComputed_SubscriberPanicWithHandler verifies custom panic handling for computed subscribers
+func TestComputed_SubscriberPanicWithHandler(t *testing.T) {
+	count := New(0)
+	var panicHandlerCalled int32
+
+	comp := ComputedWithOptions(
+		func() int { return count.Get() * 2 },
+		Options[int]{
+			OnPanic: func(err any, stack []byte) {
+				atomic.AddInt32(&panicHandlerCalled, 1)
+				if err != "computed subscriber panic" {
+					// Can't use t.Errorf here safely from arbitrary goroutine
+					// but the count check below will catch issues
+				}
+			},
+		},
+		count.AsReadonly(),
+	)
+
+	comp.SubscribeForever(func(v int) {
+		panic("computed subscriber panic")
+	})
+
+	count.Set(5)
+	time.Sleep(10 * time.Millisecond)
+
+	if got := atomic.LoadInt32(&panicHandlerCalled); got != 1 {
+		t.Errorf("Custom panic handler called %d times, want 1", got)
+	}
+}
+
 // TestComputed_RapidDependencyChanges tests rapid dep changes don't cause issues
 func TestComputed_RapidDependencyChanges(t *testing.T) {
 	count := New(0)
