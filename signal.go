@@ -33,6 +33,10 @@ type signal[T any] struct {
 	// metrics for observability (lock-free counters)
 	reads  atomic.Int64
 	writes atomic.Int64
+
+	// cached read-only view (initialized lazily by AsReadonly)
+	readonly     readonlySignal[T]
+	readonlyOnce sync.Once
 }
 
 // New creates a new writable signal with the given initial value.
@@ -221,9 +225,12 @@ func (s *signal[T]) SubscribeForever(fn func(T)) Unsubscribe {
 }
 
 // AsReadonly returns a read-only view of this signal.
-// Use for encapsulation - keep Signal private, expose ReadonlySignal.
+// Returns the same pointer on every call (cached after first initialization).
 func (s *signal[T]) AsReadonly() ReadonlySignal[T] {
-	return &readonlySignal[T]{source: s}
+	s.readonlyOnce.Do(func() {
+		s.readonly.source = s
+	})
+	return &s.readonly
 }
 
 // notifySubscribers calls all subscriber callbacks with panic recovery.
