@@ -26,7 +26,7 @@ A modern, production-grade reactive programming library for Go 1.25+ that brings
 - **Glitch-Free** - Atomic updates prevent intermediate states
 - **Lazy Evaluation** - Computed values calculate only when needed
 - **Effect Cleanup** - Automatic resource management with cleanup callbacks
-- **Production Ready** - 55 tests, 94.5% coverage, 28 benchmarks
+- **Production Ready** - 69 tests, 93.8% coverage, 28 benchmarks
 
 ---
 
@@ -121,7 +121,7 @@ eff.Stop()  // Final cleanup runs, effect stops
 
 ## Current Status
 
-**Version**: v0.1.0 (Stable - Production-ready!)
+**Version**: v0.1.1 (unreleased)
 
 **Production Readiness: Core functionality complete and stable!**
 
@@ -161,26 +161,31 @@ eff.Stop()  // Final cleanup runs, effect stops
 
 | Package | Tests | Coverage | Benchmarks |
 |---------|-------|----------|------------|
-| signals | 55    | 94.5%    | 28         |
+| signals | 69    | 93.8%    | 28         |
 
 **Key Metrics**:
 - 19 Signal tests
 - 17 Computed tests
 - 16 Effect tests
 - 3 Internal tests (type erasure, reflection fallback)
+- 10 Allocation regression tests (`testing.AllocsPerRun`)
+- 2 Subscribe lifecycle regression tests (goroutine leak, race condition)
+- 2 Readonly cache tests
 - Zero allocations in signal read/write hot paths
-- Race detector clean (all tests pass with `-race`)
+- Race detector clean (all tests pass with `-race` in CI)
 
 ### Performance Characteristics
 
 ```
-BenchmarkSignal_Get            46738254     27.72 ns/op    0 B/op    0 allocs/op
-BenchmarkSignal_Set            20975720     52.42 ns/op    0 B/op    0 allocs/op
-BenchmarkComputed_Get_Clean    79329402     19.84 ns/op    0 B/op    0 allocs/op
-BenchmarkEffect_Execute         8391343    139.6  ns/op    0 B/op    0 allocs/op
+BenchmarkSignal_Get              96773490     13.46 ns/op     0 B/op    0 allocs/op
+BenchmarkSignal_Set              20975720     52.42 ns/op     0 B/op    0 allocs/op
+BenchmarkSignal_Subscribe        17057289    134   ns/op     52 B/op    2 allocs/op
+BenchmarkComputed_Get_Clean      96773490     13.46 ns/op     0 B/op    0 allocs/op
+BenchmarkEffect_Execute           8426302    136   ns/op      0 B/op    0 allocs/op
+BenchmarkEffect_Create            7097109    324   ns/op    196 B/op    7 allocs/op
 ```
 
-*Zero allocations in hot paths ensure minimal GC pressure*
+*Zero allocations in hot paths (Get, Set, Execute). Subscribe uses context.AfterFunc — no goroutine per subscription.*
 
 ### Remaining Work
 
@@ -214,49 +219,21 @@ See [ROADMAP.md](ROADMAP.md) for detailed timeline.
 git clone https://github.com/coregx/signals.git
 cd signals
 
-# Run tests
-make test
-
-# Run tests with race detector
-make test-race
-
-# Run benchmarks
-make benchmark
-
-# Run linter
-make lint
-```
-
-### Testing
-
-```bash
 # Run all tests
-go test ./...
+go test -v ./...
+
+# Run with race detector (Linux/macOS, or CI)
+go test -v -race ./...
 
 # Run with coverage
 go test -coverprofile=coverage.out ./...
 go tool cover -html=coverage.out
 
-# Run with race detector
-go test -race ./...
-
 # Run benchmarks
 go test -bench=. -benchmem ./...
-```
 
-### Code Quality
-
-This project maintains high code quality standards:
-
-```bash
-# Format code
-make fmt
-
-# Run linter (zero issues required)
-make lint
-
-# Run all pre-commit checks
-make pre-commit
+# Run linter
+golangci-lint run
 ```
 
 ---
@@ -335,7 +312,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 **Status**: Stable - Production-ready!
-**Version**: v0.1.0
+**Version**: v0.1.1
 
 ---
 
