@@ -16,6 +16,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Migration guides
 - Best practices documentation
 
+## [0.1.1] - 2026-07-15
+
+### Fixed
+
+- **Goroutine leak in Subscribe** — each `Subscribe` call spawned a goroutine that
+  blocked for the subscription lifetime. `SubscribeForever` (context.Background)
+  parked it forever. 10k subscriptions = 10k idle goroutines (20-40MB stack waste).
+  Replaced with `context.AfterFunc` — zero goroutines per subscription.
+  ([#6](https://github.com/coregx/signals/issues/6), reported by @AnyCPU)
+
+- **Race condition in Unsubscribe** — concurrent `cancel()` + `Unsubscribe()` could
+  both reach `close(done)` via non-atomic select-default guard, causing
+  `panic: close of closed channel`. Replaced with `atomic.Bool.CompareAndSwap`
+  for idempotent cleanup.
+  ([#6](https://github.com/coregx/signals/issues/6))
+
+### Performance
+
+- **Signal_Subscribe**: 745 ns → 134 ns (5.6x faster), 224B → 52B (−77% memory)
+- **Effect_Create (1 dep)**: 1560 ns → 352 ns (4.4x faster), 384B → 196B, 10 → 7 allocs
+- **Effect_Create (3 deps)**: 4620 ns → 726 ns (6.4x faster), 1016B → 388B, 24 → 13 allocs
+- **Effect_Stop**: OOM → 330 ns (goroutine accumulation eliminated)
+- **AsReadonly()**: cached after first call (zero allocs on subsequent calls)
+
+### Added
+
+- Allocation regression tests using `testing.AllocsPerRun` — deterministic, breaks
+  build if heap allocations increase
+- Subscribe lifecycle regression tests — goroutine leak detection (10k held subs)
+  and concurrent cancel+unsub race condition
+- Cached `AsReadonly()` — returns same pointer on every call
+- Dual-path `Effect` — avoids wrapper closure allocation for effects without cleanup
+
 ## [0.1.0] - 2025-10-31
 
 ### 🎉 First Stable Release

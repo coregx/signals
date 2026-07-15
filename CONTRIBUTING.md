@@ -386,7 +386,7 @@ benchstat old.txt new.txt
 - **Documentation**: Check [docs/](docs/) and [README.md](README.md)
 - **Issues**: Search existing issues first
 - **Discussions**: Ask questions in GitHub Discussions
-- **Architecture**: Review [Architecture Overview](docs/dev/ARCHITECTURE.md)
+- **API Reference**: Review [pkg.go.dev](https://pkg.go.dev/github.com/coregx/signals)
 
 ## License
 

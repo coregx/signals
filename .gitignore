@@ -28,6 +28,9 @@ go.work
 .goda/
 docs/dev/
 
+# Temporary files
+tmp/
+
 # OS files
 .DS_Store
 Thumbs.db

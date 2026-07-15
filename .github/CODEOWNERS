@@ -27,9 +27,6 @@
 # GitHub configuration and CI/CD
 /.github/ @kolkov
 
-# Scripts - Build automation and quality checks
-/scripts/ @kolkov
-
 # Tests - Ensure coverage and reliability
 *_test.go @kolkov
 *_bench_test.go @kolkov

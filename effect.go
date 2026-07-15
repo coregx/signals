@@ -22,8 +22,12 @@ type EffectRef interface {
 
 // effect is the internal implementation of Effect.
 type effect struct {
-	// fn is the effect function that may return a cleanup function
+	// fn is the effect function that returns a cleanup function (EffectWithCleanup path)
 	fn func() func()
+
+	// fnSimple is the effect function without cleanup (Effect path).
+	// When set, fn is nil — avoids a wrapper closure allocation.
+	fnSimple func()
 
 	// cleanup is the current cleanup function from the last run
 	cleanup func()
@@ -70,12 +74,7 @@ type effect struct {
 //
 // For effects that need cleanup, use EffectWithCleanup instead.
 func Effect(fn func(), deps ...any) EffectRef {
-	// Wrap fn to match cleanup signature (returns nil cleanup)
-	wrappedFn := func() func() {
-		fn()
-		return nil
-	}
-	return EffectWithCleanup(wrappedFn, deps...)
+	return effectCreate(fn, nil, EffectOptions{}, deps...)
 }
 
 // EffectWithCleanup creates an effect with cleanup callback support.
@@ -145,28 +144,29 @@ type EffectOptions struct {
 //	    count.AsReadonly(),
 //	)
 func EffectWithOptions(fn func() func(), opts EffectOptions, deps ...any) EffectRef {
+	return effectCreate(nil, fn, opts, deps...)
+}
+
+// effectCreate is the shared constructor for both Effect and EffectWithCleanup paths.
+// Exactly one of fnSimple or fn must be non-nil.
+func effectCreate(fnSimple func(), fn func() func(), opts EffectOptions, deps ...any) EffectRef {
 	e := &effect{
-		fn:      fn,
-		onPanic: opts.OnPanic,
+		fn:           fn,
+		fnSimple:     fnSimple,
+		onPanic:      opts.OnPanic,
+		unsubscribes: make([]Unsubscribe, 0, len(deps)),
 	}
 
-	// Track dependencies using type erasure (subscribe to changes)
+	runFn := e.run
 	for _, dep := range deps {
-		e.trackDependency(dep)
+		unsub := trackDependencyHelper(dep, runFn)
+		e.unsubscribes = append(e.unsubscribes, unsub)
 	}
 
 	// CRITICAL: Run effect IMMEDIATELY (Angular pattern)
-	// This MUST happen before returning the effect
 	e.run()
 
 	return e
-}
-
-// trackDependency registers a signal as a dependency using type erasure.
-// This subscribes to the dependency so the effect re-runs when it changes.
-func (e *effect) trackDependency(dep any) {
-	unsub := trackDependencyHelper(dep, e.run)
-	e.unsubscribes = append(e.unsubscribes, unsub)
 }
 
 // run executes the effect function with proper cleanup handling.
@@ -211,23 +211,36 @@ func (e *effect) run() {
 		}()
 	}
 
-	// Step 2: Execute effect function and capture new cleanup
-	var newCleanup func()
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				if e.onPanic != nil {
-					e.onPanic(r, debug.Stack())
-				} else {
-					log.Printf("signals: panic in effect function: %v\n%s", r, debug.Stack())
+	// Step 2: Execute effect function
+	if e.fnSimple != nil {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					if e.onPanic != nil {
+						e.onPanic(r, debug.Stack())
+					} else {
+						log.Printf("signals: panic in effect function: %v\n%s", r, debug.Stack())
+					}
 				}
-			}
+			}()
+			e.fnSimple()
 		}()
-		newCleanup = e.fn()
-	}()
-
-	// Step 3: Store new cleanup
-	e.cleanup = newCleanup
+	} else {
+		var newCleanup func()
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					if e.onPanic != nil {
+						e.onPanic(r, debug.Stack())
+					} else {
+						log.Printf("signals: panic in effect function: %v\n%s", r, debug.Stack())
+					}
+				}
+			}()
+			newCleanup = e.fn()
+		}()
+		e.cleanup = newCleanup
+	}
 }
 
 // Stop stops the effect and runs final cleanup.

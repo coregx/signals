@@ -182,41 +182,29 @@ func (c *computed[T]) Get() T {
 // Note: Unlike regular signals, computed signals only notify after recomputation,
 // not on every dependency change (lazy evaluation).
 func (c *computed[T]) Subscribe(ctx context.Context, fn func(T)) Unsubscribe {
-	// Add subscriber
 	c.mu.Lock()
 	id := c.nextID
 	c.nextID++
 	c.subscribers[id] = fn
 	c.mu.Unlock()
 
-	// Channel for cleanup coordination
-	done := make(chan struct{})
-
-	// Auto-cleanup on context cancellation
-	go func() {
-		select {
-		case <-ctx.Done():
+	var cleaned atomic.Bool
+	remove := func() {
+		if cleaned.CompareAndSwap(false, true) {
 			c.mu.Lock()
 			delete(c.subscribers, id)
 			c.mu.Unlock()
-			close(done)
-		case <-done:
-			// Manual unsubscribe
 		}
-	}()
+	}
 
-	// Return manual unsubscribe
+	if ctx.Done() == nil {
+		return remove
+	}
+
+	stop := context.AfterFunc(ctx, remove)
 	return func() {
-		c.mu.Lock()
-		delete(c.subscribers, id)
-		c.mu.Unlock()
-
-		select {
-		case <-done:
-			// Already closed
-		default:
-			close(done)
-		}
+		stop()
+		remove()
 	}
 }
 
