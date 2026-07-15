@@ -174,43 +174,34 @@ func (s *signal[T]) Update(fn func(T) T) {
 //	})
 //	defer unsub()  // Cleanup (before context timeout)
 func (s *signal[T]) Subscribe(ctx context.Context, fn func(T)) Unsubscribe {
-	// Add subscriber with unique ID
 	s.mu.Lock()
 	id := s.nextID
 	s.nextID++
 	s.subscribers[id] = fn
 	s.mu.Unlock()
 
-	// Channel to signal cleanup completion
-	done := make(chan struct{})
-
-	// Goroutine for context-based cleanup
-	go func() {
-		select {
-		case <-ctx.Done():
-			// Context canceled - auto cleanup
+	// atomic.Bool.CompareAndSwap makes cleanup idempotent without the
+	// extra heap allocation that sync.Once requires for its struct.
+	var cleaned atomic.Bool
+	remove := func() {
+		if cleaned.CompareAndSwap(false, true) {
 			s.mu.Lock()
 			delete(s.subscribers, id)
 			s.mu.Unlock()
-			close(done)
-		case <-done:
-			// Manual unsubscribe happened
 		}
-	}()
+	}
 
-	// Return manual unsubscribe function
+	// ctx.Done() == nil covers context.Background(), context.TODO(),
+	// and any custom never-canceled context — return remove directly
+	// to avoid an extra wrapper closure allocation.
+	if ctx.Done() == nil {
+		return remove
+	}
+
+	stop := context.AfterFunc(ctx, remove)
 	return func() {
-		s.mu.Lock()
-		delete(s.subscribers, id)
-		s.mu.Unlock()
-
-		// Signal goroutine to stop
-		select {
-		case <-done:
-			// Already closed by context
-		default:
-			close(done)
-		}
+		stop()
+		remove()
 	}
 }
 
