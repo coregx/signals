@@ -112,10 +112,10 @@ eff.Stop()  // Final cleanup runs, effect stops
 - **[API Reference](https://pkg.go.dev/github.com/coregx/signals)** - Complete API documentation
 - **[Examples](cmd/example/)** - Working code examples
 
-### Advanced
-- **[Architecture Overview](docs/dev/ARCHITECTURE.md)** - How it works internally
-- **[Implementation Guide](docs/dev/IMPLEMENTATION_GUIDE.md)** - Development guide
-- **[Angular Signals Analysis](docs/dev/ANGULAR_SIGNALS_ANALYSIS.md)** - Comparison with Angular
+### Design
+- **Angular-Inspired** - API design mirrors Angular Signals (see [Compatibility table](#angular-signals-compatibility))
+- **Explicit Dependencies** - Go requires explicit dependency passing (no auto-tracking like Angular)
+- **Zero Allocation Hot Paths** - Get/Set/Execute paths are allocation-free
 
 ---
 
@@ -245,7 +245,7 @@ Contributions are welcome! This is an early-stage project and we'd love your hel
 **Before contributing**:
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md) - Development workflow and guidelines
 2. Check [open issues](https://github.com/coregx/signals/issues)
-3. Review the [Architecture Overview](docs/dev/ARCHITECTURE.md)
+3. Review the [API Reference](https://pkg.go.dev/github.com/coregx/signals)
 
 **Ways to contribute**:
 - Report bugs
