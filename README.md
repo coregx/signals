@@ -317,3 +317,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 *Built with care for the Go community*
+
+
+## Star History
+
+<a href="https://starhistory.io">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.starhistory.io/png?repos=coregx/signals&style=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.starhistory.io/png?repos=coregx/signals&style=professional" />
+   <img alt="Star History Chart" src="https://api.starhistory.io/png?repos=coregx/signals" width="800" />
+ </picture>
+</a>
