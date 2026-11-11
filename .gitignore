@@ -27,6 +27,8 @@ go.work
 .pm/
 .goco/
 .goda/
+.gode/
+.mcp.json
 docs/dev/
 
 # Temporary files
