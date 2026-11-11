@@ -24,6 +24,7 @@ go.work
 
 # Private directories
 .claude/
+.pm/
 .goco/
 .goda/
 docs/dev/
